@@ -13,7 +13,7 @@ The fastest way to use it is to right-click the file and click "Run as Administr
 
 ![im1](https://raw.githubusercontent.com/ricardojoserf/ricardojoserf.github.io/master/images/custom-lsass-dumper-csharp/image1.png)
 
-This generates a file with the hostname ("DESKTOP-MA54241") and the date (28/08/2021) as name and with extension ".txt":
+This generates a file with the hostname ("DESKTOP-MA54241") and the date (30/08/2021) as name and with extension ".txt":
 
 ![im2](https://raw.githubusercontent.com/ricardojoserf/ricardojoserf.github.io/master/images/custom-lsass-dumper-csharp/image2.png)
 
