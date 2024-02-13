@@ -63,6 +63,9 @@ namespace CustomD
             out IntPtr lpNumberOfBytesRead
         );
 
+        [DllImport("Kernel32.dll", CharSet = CharSet.Unicode, CallingConvention = CallingConvention.StdCall)] public static extern int CloseHandle(IntPtr hObject);
+
+
         [DllImport("kernel32.dll")]
         public static extern bool WriteFile(
             IntPtr hFile,
