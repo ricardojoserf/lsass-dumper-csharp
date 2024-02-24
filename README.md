@@ -1,10 +1,12 @@
 # Customizing Lsass Dumps with C#
 
-We will use C# to create a program that dumps the lsass.exe process in the stealthier way we can.  
+Yet another C# program to dump lsass.exe. Without input arguments it creates a dump file with the hostname and date as name and the ".txt" extension (*hostname_DD-MM-YYYY-HHMM.txt*). With input arguments it will use the first one as path for the file.
 
-Without input arguments it creates a dump file with the hostname and date as name and the ".txt" extension (*hostname_DD-MM-YYYY-HHMM.txt*). With input arguments it will use the first one as path for the file.  
-
-To try to be stealthier, we will not use the "lsass" or "SeDebugPrivilege" strings and will try not to use the "minidump" string when possible. The code is explained [in here](https://ricardojoserf.github.io/lsassdumper-csharp/).
+- Dump is done from a snapshot of the lsass process using PssCaptureSnapshot
+- XOR-encoding the dump using a callback function in MinidumpWriteDump call
+- Dynamic function resolution with custom implementations for GetProcAddress and GetModuleHandle
+- Process enumeration is done using NtGetNextProcessDelegate and GetProcessImageFileNameDelegate 
+- Trying to unhook NTDLL and DBGHELP dlls by overwriting the .text sections
 
 
 ## Usage
