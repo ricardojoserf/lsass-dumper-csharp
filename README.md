@@ -27,6 +27,8 @@ The file is generated correctly:
 
 ![im4](https://raw.githubusercontent.com/ricardojoserf/ricardojoserf.github.io/master/images/custom-lsass-dumper-csharp/image4.png)
 
-Then we can parse these dump files with Mimikatz, as it does not care about the extension:
+Using the Decoder project we can compile the XOR decoder and decode the dump.
+
+Then we can parse the decoded dump file with Mimikatz, as it does not care about the extension:
 
 ![im5](https://raw.githubusercontent.com/ricardojoserf/ricardojoserf.github.io/master/images/custom-lsass-dumper-csharp/image5.png)
